@@ -1,0 +1,48 @@
+name: CI
+on: [ push, pull_request ]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: testdb
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Node 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r services/api/requirements.txt
+        npm install --workspace apps/web
+    - name: Run back API tests
+      run: pytest services/api
+    - name: Run Cypress on web
+      run: |
+        npm install --workspace apps/web
+        npm run test:cypress --workspace apps/web
+    - name: Flutter analyze & test
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.27.1'
+        cache: true
+      run: |
+        cd apps/mobile
+        flutter pub get
+        flutter test
